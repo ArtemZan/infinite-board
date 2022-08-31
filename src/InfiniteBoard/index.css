@@ -1,0 +1,17 @@
+.items-wrapper
+{
+    position: relative;
+    user-select: none;
+}
+
+.infinite-board
+{
+    overflow: auto;
+    width: 100vw;
+    height: 100vh;
+}
+
+.draggable
+{
+    position: absolute;
+}
