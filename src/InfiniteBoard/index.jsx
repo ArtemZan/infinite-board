@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, createContext, useContext } from "react";
+import { useEffect, useRef, useState, createContext, useContext, Component, createRef } from "react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import { DragableContextProvider } from "./DragHandle";
 import { DragHandle } from "./DragHandle"
@@ -7,14 +7,15 @@ import "./index.css"
 const context = createContext({ scale: 1, bounds: { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } }, mousePos: { x: 0, y: 0 }, offset: { x: 0, y: 0 } })
 
 export function InifiniteBoard({ items, updateItem, children }) {
-    const draggedIndex = useRef(null)
+    const [draggedIndex, setDraggedIndex] = useState(null)
+    const draggedIndexRef = useRef(null)
+    draggedIndexRef.current = draggedIndex
     const dragOffset = useRef({ x: 0, y: 0 })
     const mousePos = useRef({ x: 0, y: 0 })
     const itemsWrapper = useRef()
     const board = useRef()
     const canvasBounds = useRef({ min: { x: 0, y: 0 }, max: { x: 0, y: 0 } })
     const [canvasSize, setCanvasSize] = useState({ x: 0, y: 0 })
-    const spaceUpdateTimeout = useRef(null)
     const isBoardDragged = useRef(false)
     const boardDragOffset = useRef({ x: 0, y: 0 })
     const [scale, setScale] = useState(1)
@@ -24,17 +25,20 @@ export function InifiniteBoard({ items, updateItem, children }) {
     const offset = useRef({ x: 0, y: 0 })
     const lastValidPosition = useRef({ x: 0, y: 0 })
 
+    const scrollbarSize = 25
     const padding = 0
 
-    function updateSpace() {
+    function updateItems() {
 
         const { min, max } = canvasBounds.current
+
+
 
         let updated = false
 
         const elements = [...itemsWrapper.current.children]
 
-        const element = elements[draggedIndex.current]
+        const element = elements[draggedIndexRef.current]
         const rect = element.getBoundingClientRect()
 
         const updatedRect = {
@@ -74,7 +78,7 @@ export function InifiniteBoard({ items, updateItem, children }) {
         let foundIntersection = false
 
         for (let i in elements) {
-            if (i == draggedIndex.current) {
+            if (i == draggedIndexRef.current) {
                 continue
             }
 
@@ -95,7 +99,7 @@ export function InifiniteBoard({ items, updateItem, children }) {
             lastValidPosition.current = updatedPosition
         }
 
-        updateItem(draggedIndex.current, updatedPosition)
+        updateItem(draggedIndexRef.current, updatedPosition)
 
         if (updatedPosition.x < min.x || updatedPosition.y < min.y) {
             updated = true
@@ -110,18 +114,10 @@ export function InifiniteBoard({ items, updateItem, children }) {
 
 
         if (isBoardDragged.current) {
-            //console.log("Drag board", boardDragOffset.current.y, mousePos.current.y)
+            console.log("Drag board", boardDragOffset.current.y, mousePos.current.y)
 
             const x = boardDragOffset.current.x - mousePos.current.x
             const y = boardDragOffset.current.y - mousePos.current.y
-
-            
-            const scrollbarSize = 25
-
-            setCanvasSize({
-                x: Math.max((x + boardRect.current.width) / scaleRef.current, canvasBounds.current.max.x - canvasBounds.current.min.x) - Math.min(x + scrollbarSize, 0),
-                y: Math.max((y + boardRect.current.height) / scaleRef.current, canvasBounds.current.max.y - canvasBounds.current.min.y) - Math.min(y + scrollbarSize, 0)
-            })
 
             offset.current = { x, y }
 
@@ -129,35 +125,37 @@ export function InifiniteBoard({ items, updateItem, children }) {
                 x,
                 y
             })
+
+            updateCanvasSize()
         }
+
 
         //console.log(draggedIndex.current)
 
-        if (draggedIndex.current === null) {
+        if (draggedIndexRef.current === null) {
             return
         }
 
-        if (spaceUpdateTimeout.current === null) {
-            //console.log("Calling update")
-            updateSpace()
-        }
+        updateItems()
     }
 
     function onMouseUp() {
         //console.log("Mouse up")
-        if (draggedIndex.current !== null && lastValidPosition.current) {
+        if (draggedIndexRef.current !== null && lastValidPosition.current) {
             //updateItem(draggedIndex.current, lastValidPosition.current)
             lastValidPosition.current = null
         }
 
-        draggedIndex.current = null
+        setDraggedIndex(null)
         isBoardDragged.current = false
     }
 
     function onDragStart(e, index) {
         e.stopPropagation()
 
-        draggedIndex.current = index
+        canvasBounds.current = calculateBounds()
+
+        setDraggedIndex(index)
 
         const element = itemsWrapper.current.children[index]
         const rect = element.getBoundingClientRect()
@@ -181,6 +179,8 @@ export function InifiniteBoard({ items, updateItem, children }) {
 
         const first = elements[0]
 
+        //console.log(elements)
+
         const min = {
             x: first.x,
             y: first.y
@@ -192,7 +192,6 @@ export function InifiniteBoard({ items, updateItem, children }) {
         }
 
         for (const el of elements) {
-            //console.log(el)
             if (el.x < min.x) {
                 min.x = el.x
             }
@@ -210,7 +209,7 @@ export function InifiniteBoard({ items, updateItem, children }) {
             }
         }
 
-        const padding = 0
+        //console.log(min)
 
         return {
             min: { x: min.x - padding, y: min.y - padding },
@@ -249,6 +248,15 @@ export function InifiniteBoard({ items, updateItem, children }) {
         })
     }
 
+    function updateCanvasSize() {
+        const { x, y } = offset.current
+
+        setCanvasSize({
+            x: Math.max((x + boardRect.current.width) / scaleRef.current, canvasBounds.current.max.x - canvasBounds.current.min.x) - Math.min(x + scrollbarSize, 0),
+            y: Math.max((y + boardRect.current.height) / scaleRef.current, canvasBounds.current.max.y - canvasBounds.current.min.y) - Math.min(y + scrollbarSize, 0)
+        })
+    }
+
     useEffect(() => {
         document.addEventListener("mouseup", onMouseUp)
         document.addEventListener("mousemove", onMouseMove)
@@ -266,25 +274,34 @@ export function InifiniteBoard({ items, updateItem, children }) {
     }, [])
 
     useEffect(() => {
-        if (draggedIndex.current !== null) {
+        if (draggedIndex !== null) {
             return
         }
 
-        canvasBounds.current = calculateBounds()
-        //canvasBounds.current.min = {x: 0, y: 0}
         const { min, max } = canvasBounds.current
-        //console.log(min, max)
-        //setCanvasSize({ x: max.x - min.x, y: max.y - min.y })
-        
-        const {x, y} = offset.current
+        const updatedBounds = calculateBounds()
+        canvasBounds.current = updatedBounds
 
-        setCanvasSize({
-            x: Math.max((x + boardRect.current.width) / scaleRef.current - padding, canvasBounds.current.max.x - canvasBounds.current.min.x + padding) - Math.min(x, -padding) - 500,
-            y: Math.max((y + boardRect.current.height) / scaleRef.current - padding, canvasBounds.current.max.y - canvasBounds.current.min.y + padding) - Math.min(y, -padding) - 500
-        })
-    }, [items, draggedIndex])
+        offset.current = {
+            x: offset.current.x + min.x - updatedBounds.min.x,
+            y: offset.current.y + min.y - updatedBounds.min.y
+        }
+
+
+        setScroll(offset.current)
+
+        //canvasBounds.current.min = {x: 0, y: 0}
+        console.log(min, max)
+
+        updateCanvasSize()
+
+
+        //updateCanvasSize()
+
+    }, [draggedIndex])
 
     useEffect(() => {
+        console.log(scroll)
         board.current.scrollLeft = scroll.x
         board.current.scrollTop = scroll.y
     }, [scroll])
@@ -295,6 +312,8 @@ export function InifiniteBoard({ items, updateItem, children }) {
     })
 
     const { min } = canvasBounds.current
+
+    console.log(canvasBounds.current)
 
     return <context.Provider value={{ scale, bounds: canvasBounds.current, containerRect: boardRect, mousePos, offset: { x: scroll.x, y: scroll.y } }}>
         <div className="infinite-board" ref={board} onMouseDown={onBoardDragStart}
