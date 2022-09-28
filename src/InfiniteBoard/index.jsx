@@ -323,7 +323,7 @@ export function InifiniteBoard({ items, updateItem, children }) {
             <div
                 className="items-wrapper"
                 ref={itemsWrapper}
-                style={{ width: canvasSize.x, height: canvasSize.y, transform: `scale(${scale})` }}
+                style={{ width: canvasSize.x * scale, height: canvasSize.y * scale, transform: `scale(${scale})` }}
             >
                 {items.map((item, index) => {
                     return <DragableContextProvider
